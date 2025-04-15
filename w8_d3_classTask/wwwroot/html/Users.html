@@ -1,0 +1,67 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Lazy Loaded Users</title>
+    <style>
+        body {
+            font-family: Arial;
+            padding: 20px;
+        }
+
+        .user {
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin-bottom: 15px;
+            box-shadow: 0 0 4px rgba(0, 0, 0, 0.1);
+        }
+
+            .user img {
+                max-width: 100%;
+                height: auto;
+                display: block;
+                margin-bottom: 10px;
+                border-radius: 4px;
+            }
+
+        .name {
+            font-weight: bold;
+            font-size: 1.2em;
+        }
+
+        .email {
+            color: #555;
+        }
+    </style>
+</head>
+<body>
+    <h1>Lazy Loaded Users</h1>
+    <button onclick="fetchUsers()">Load Users</button>
+    <div id="usersContainer"></div>
+
+    <script>
+        async function fetchUsers() {
+            const response = await fetch('https://localhost:44326/api/users'); 
+            const users = await response.json();
+
+            const container = document.getElementById('usersContainer');
+            container.innerHTML = '';
+
+            users.forEach(user => {
+                const div = document.createElement('div');
+                div.className = 'user';
+                div.innerHTML = `
+                    <img src="https://i.pravatar.cc/150?u=${user.id}" alt="User Avatar" loading="lazy" />
+                    <div class="name">${user.name}</div>
+                    <div class="email">${user.email}</div>
+                    <div><strong>Username:</strong> ${user.username}</div>
+                    <div><strong>Phone:</strong> ${user.phone}</div>
+                    <div><strong>Website:</strong> <a href="http://${user.website}" target="_blank">${user.website}</a></div>
+                    <div><strong>Company:</strong> ${user.company?.name}</div>
+                `;
+                container.appendChild(div);
+            });
+        }
+    </script>
+</body>
+</html>
