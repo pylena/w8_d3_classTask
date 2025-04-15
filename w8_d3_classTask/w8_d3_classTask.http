@@ -1,0 +1,6 @@
+@w8_d3_classTask_HostAddress = http://localhost:5106
+
+GET {{w8_d3_classTask_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
