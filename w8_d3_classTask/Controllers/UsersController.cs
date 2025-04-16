@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Caching.Distributed;
 using System.Text.Json;
+using w8_d3_classTask.Services.Caching;
 
 namespace w8_d3_classTask.Controllers
 {
@@ -11,27 +12,27 @@ namespace w8_d3_classTask.Controllers
     {
         //inject nedded services 
         private readonly IHttpClientFactory _httpClientFactory;
-        private readonly IDistributedCache _cache;
         private readonly ILogger<UsersController> _logger;
+        private readonly IRedisCacheService _redisCacheService;
 
 
-        public UsersController(IHttpClientFactory httpClientFactory, IDistributedCache cache, ILogger<UsersController> logger)
+
+        public UsersController(IHttpClientFactory httpClientFactory, IRedisCacheService redisCacheService, ILogger<UsersController> logger)
         {
             _httpClientFactory = httpClientFactory;
-            _cache = cache;
+            _redisCacheService = redisCacheService;
             _logger = logger;
         }
 
         [HttpGet]
         public async Task<IActionResult> GetUsers()
         {
-            string cacheKey = "users";
-            string? cachedData = await _cache.GetStringAsync(cacheKey);
+            const string CacheKey = "users";
+            var cachedUsers = _redisCacheService.GetData<object>(CacheKey);
 
-            if (!string.IsNullOrEmpty(cachedData))
+            if (cachedUsers is not null)
             {
-                _logger.LogInformation("Users data from Redis Cache");
-                var cachedUsers = JsonSerializer.Deserialize<object>(cachedData);
+                _logger.LogInformation("✅ Users data returned from Redis cache.");
                 return Ok(cachedUsers);
             }
 
@@ -40,17 +41,15 @@ namespace w8_d3_classTask.Controllers
 
             if (!response.IsSuccessStatusCode)
             {
-                return StatusCode((int)response.StatusCode, "Failed to fetch from external API.");
+                return StatusCode((int)response.StatusCode, "❌ Failed to fetch data from external API.");
             }
 
             var json = await response.Content.ReadAsStringAsync();
-            await _cache.SetStringAsync(cacheKey, json, new DistributedCacheEntryOptions
-            {
-                AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5)
-            });
-
-            _logger.LogInformation("Users data fetched from API and cached in Redis");
             var users = JsonSerializer.Deserialize<object>(json);
+
+            _redisCacheService.SetData(CacheKey, users);
+            _logger.LogInformation(" Users data fetched from API and cached in Redis.");
+
             return Ok(users);
         }
     }

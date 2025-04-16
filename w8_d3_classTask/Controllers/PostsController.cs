@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Caching.Distributed;
 using System.Text.Json;
+using w8_d3_classTask.Services.Caching;
 
 namespace w8_d3_classTask.Controllers
 {
@@ -11,28 +12,30 @@ namespace w8_d3_classTask.Controllers
     {
         //inject nedded services 
         private readonly IHttpClientFactory _httpClientFactory;
-        private readonly IDistributedCache _cache;
         private readonly ILogger<PostsController> _logger;
+        private readonly IRedisCacheService _redisCacheService;
 
 
-        public PostsController(IHttpClientFactory httpClientFactory, IDistributedCache cache, ILogger<PostsController> logger)
+        public PostsController(IHttpClientFactory httpClientFactory, ILogger<PostsController> logger, IRedisCacheService redisCacheService)
         {
             _httpClientFactory = httpClientFactory;
-            _cache = cache;
             _logger = logger;
+
+            _redisCacheService = redisCacheService;
         }
+
 
 
         [HttpGet]
         public async Task<IActionResult> GetPosts()
         {
-            string cacheKey = "posts";
-            string? cachedData = await _cache.GetStringAsync(cacheKey);
+            const string cacheKey = "posts";
 
-            if (!string.IsNullOrEmpty(cachedData))
+            var cachedPosts = _redisCacheService.GetData<object>(cacheKey);
+
+            if (cachedPosts is not null)
             {
-                _logger.LogInformation("Data from Redis Cache");
-                var cachedPosts = JsonSerializer.Deserialize<object>(cachedData);
+                _logger.LogInformation(" Data returned from Redis .");
                 return Ok(cachedPosts);
             }
 
@@ -40,17 +43,18 @@ namespace w8_d3_classTask.Controllers
             var response = await client.GetAsync("https://jsonplaceholder.typicode.com/posts");
 
             if (!response.IsSuccessStatusCode)
-                return StatusCode((int)response.StatusCode, "Failed to fetch from external API.");
+            {
+                return StatusCode((int)response.StatusCode, "Failed to fetch data from external API.");
+            }
 
             var json = await response.Content.ReadAsStringAsync();
-            await _cache.SetStringAsync(cacheKey, json, new DistributedCacheEntryOptions
-            {
-                AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5) // cache expires in 5 mins
-            });
-
-            _logger.LogInformation("Data fetched from API and cached in Redis");
             var posts = JsonSerializer.Deserialize<object>(json);
+
+            _redisCacheService.SetData(cacheKey, posts);
+            _logger.LogInformation("Data fetched from API and cached in Redis.");
+
             return Ok(posts);
         }
+
     }
 }
